@@ -47,7 +47,7 @@ public partial class App : System.Windows.Application
     private static void SetThemeColor(ResourceDictionary resources,string colorKey,string brushKey,string value)
     {
         var color=(System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(value); resources[colorKey]=color;
-        if(resources[brushKey] is System.Windows.Media.SolidColorBrush brush) brush.Color=color;
+        resources[brushKey]=new System.Windows.Media.SolidColorBrush(color);
     }
     private static bool UsesDarkSystemTheme()
     {

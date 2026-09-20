@@ -1,6 +1,6 @@
 ; Build with Inno Setup 6. This creates a per-user install and a clean uninstaller.
 #define AppName "Clipboard Pro"
-#define AppVersion "1.0.6"
+#define AppVersion "1.0.7"
 #define AppExeName "ClipboardPro.exe"
 [Setup]
 AppId={{8BC88A28-B048-4EC6-A8CB-66EF8D1549E5}
@@ -26,7 +26,7 @@ Name: "startup"; Description: "Iniciar Clipboard Pro con Windows"; Flags: unchec
 Name: "desktopicon"; Description: "Crear acceso directo en el escritorio"; Flags: unchecked
 [Icons]
 Name: "{autostartup}\Clipboard Pro"; Filename: "{app}\{#AppExeName}"; Parameters: "--background"; Tasks: startup
-Name: "{autodesktop}\Clipboard Pro"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
+Name: "{autodesktop}\Clipboard Pro"; Filename: "{app}\{#AppExeName}"; IconFilename: "{app}\Assets\ClipboardPro.ico"; Tasks: desktopicon
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "Abrir Clipboard Pro"; Flags: nowait postinstall skipifsilent
 [Code]
