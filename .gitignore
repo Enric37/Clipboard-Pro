@@ -1,0 +1,23 @@
+# Build and packaging output
+[Bb]in/
+[Oo]bj/
+artifacts/
+*.msi
+*.exe
+*.pdb
+
+# Local Clipboard Pro data — never publish user clipboard or diagnostics
+clipboard.db
+settings.json
+logs/
+images/
+*.log
+
+# Credentials and editor state
+.env
+.env.*
+!.env.example
+.vs/
+.idea/
+*.user
+*.suo
