@@ -4,7 +4,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
-using System.Windows.Threading;
 using ClipboardPro.Interop;
 using ClipboardPro.Models;
 using ClipboardPro.Services;
@@ -14,10 +13,10 @@ namespace ClipboardPro;
 public partial class MainWindow : Window
 {
     private readonly ClipDatabase _database; private readonly ClipboardCaptureService _clipboard; private readonly SettingsService _settings; private readonly ObservableCollection<ClipItem> _items = new();
-    private CancellationTokenSource? _searchCts; private ClipType? _type; private bool _favorites; private int _loaded; private IntPtr _previousWindow; private bool _openingSettings; private bool _panelOptionsOpen; private bool _adjustingBounds; private bool _pinnedSizeInitialized; private DispatcherTimer? _positionSaveTimer;
+    private CancellationTokenSource? _searchCts; private ClipType? _type; private bool _favorites; private int _loaded; private IntPtr _previousWindow; private bool _openingSettings; private bool _panelOptionsOpen; private bool _adjustingBounds; private bool _pinnedSizeInitialized;
     public MainWindow(ClipDatabase database, ClipboardCaptureService clipboard, SettingsService settings)
     {
-        InitializeComponent(); _database=database; _clipboard=clipboard; _settings=settings; ClipList.ItemsSource=_items; AllFilter.Background = (System.Windows.Media.Brush)FindResource("SurfaceHoverBrush"); _positionSaveTimer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(300) }; _positionSaveTimer.Tick += async (_,_)=> { _positionSaveTimer.Stop(); await SavePanelPositionAsync(); }; ApplyPanelPreferences(true);
+        InitializeComponent(); _database=database; _clipboard=clipboard; _settings=settings; ClipList.ItemsSource=_items; AllFilter.Background = (System.Windows.Media.Brush)FindResource("SurfaceHoverBrush"); ApplyPanelPreferences(true);
     }
     public async Task OpenAsync()
     {
@@ -32,7 +31,7 @@ public partial class MainWindow : Window
     }
     private void RestorePanelPosition()
     {
-        if(_settings.Current.PanelLeft is double left && _settings.Current.PanelTop is double top) { Left=left; Top=top; KeepPanelWithinWorkArea(false); }
+        if(_settings.Current.PanelLeft is double left && _settings.Current.PanelTop is double top) { Left=left; Top=top; }
         else PositionNearCursor();
     }
     private async Task SavePanelPositionAsync()
@@ -66,7 +65,7 @@ public partial class MainWindow : Window
         }
         else { Topmost=false; ShowInTaskbar=false; _pinnedSizeInitialized=false; KeepPanelWithinWorkArea(false); }
     }
-    public void HidePanel() { _positionSaveTimer?.Stop(); _=SavePanelPositionAsync(); if (IsVisible) Hide(); }
+    public void HidePanel() { _=SavePanelPositionAsync(); if (IsVisible) Hide(); }
     private async Task RefreshAsync(bool append=false, CancellationToken cancellationToken=default)
     {
         if (!append) { _items.Clear(); _loaded=0; }
@@ -98,18 +97,13 @@ public partial class MainWindow : Window
     }
     private void Window_Deactivated(object sender, EventArgs e) { if (!_openingSettings && !_panelOptionsOpen && !_settings.Current.PanelPinned) Dispatcher.BeginInvoke(HidePanel); }
     private void Window_SizeChanged(object sender, SizeChangedEventArgs e) => KeepPanelWithinWorkArea(false);
-    private void Window_LocationChanged(object? sender, EventArgs e)
-    {
-        if(!IsVisible || _adjustingBounds || _positionSaveTimer is null) return;
-        _positionSaveTimer.Stop(); _positionSaveTimer.Start();
-    }
     private void KeepPanelWithinWorkArea(bool pinned)
     {
         if(_adjustingBounds || !IsLoaded) return;
         _adjustingBounds=true;
         try
         {
-            var area=GetWorkArea(!pinned); var maxWidth=Math.Max(MinWidth,area.Width-24); var maxHeight=Math.Max(MinHeight,area.Height-24);
+            var area=GetWorkArea(); var maxWidth=Math.Max(MinWidth,area.Width-24); var maxHeight=Math.Max(MinHeight,area.Height-24);
             if(Width>maxWidth) Width=maxWidth; if(Height>maxHeight) Height=maxHeight;
             var width=ActualWidth>0 ? ActualWidth : Width; var height=ActualHeight>0 ? ActualHeight : Height;
             if(pinned) PositionPinned(); else { Left=ClampToArea(Left,area.Left+12,area.Right-width-12); Top=ClampToArea(Top,area.Top+12,area.Bottom-height-12); }
@@ -140,11 +134,11 @@ public partial class MainWindow : Window
         if (Selected is not { Type: ClipType.Text or ClipType.Code or ClipType.Url or ClipType.Color } item) return; var dialog=new EditClipWindow(item.Content){Owner=this}; if(dialog.ShowDialog()==true) { await _database.UpdateContentAsync(item.Id,dialog.Value); await RefreshAsync(); }
     }
     private void More_Click(object sender, RoutedEventArgs e) { if (Selected is null) return; var menu=ClipList.ContextMenu; menu.PlacementTarget=(Button)sender; menu.IsOpen=true; }
-    private void DragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private async void DragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if(e.LeftButton!=MouseButtonState.Pressed) return;
         e.Handled=true;
-        try { DragMove(); KeepPanelWithinWorkArea(false); _positionSaveTimer?.Stop(); _positionSaveTimer?.Start(); } catch { }
+        try { DragMove(); KeepPanelWithinWorkArea(false); await SavePanelPositionAsync(); } catch { }
     }
     private void PanelOptions_Click(object sender, RoutedEventArgs e)
     {

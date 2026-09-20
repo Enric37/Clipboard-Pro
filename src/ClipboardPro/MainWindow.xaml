@@ -4,7 +4,7 @@
         xmlns:m="clr-namespace:ClipboardPro.Models"
         Width="780" Height="590" MinWidth="440" MinHeight="360"
         WindowStyle="None" ResizeMode="CanResizeWithGrip" Background="Transparent" AllowsTransparency="True" ShowInTaskbar="False"
-        Deactivated="Window_Deactivated" KeyDown="Window_KeyDown" SizeChanged="Window_SizeChanged" LocationChanged="Window_LocationChanged">
+        Deactivated="Window_Deactivated" KeyDown="Window_KeyDown" SizeChanged="Window_SizeChanged">
   <Border Margin="10" Background="{DynamicResource BgBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="16" Padding="15" SnapsToDevicePixels="True">
     <Border.Effect><DropShadowEffect BlurRadius="26" ShadowDepth="5" Opacity=".32" Color="#000000"/></Border.Effect>
     <Grid>
