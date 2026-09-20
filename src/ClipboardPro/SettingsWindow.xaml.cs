@@ -10,15 +10,45 @@ public partial class SettingsWindow : Window
 {
     private readonly SettingsService _settings; private readonly ClipDatabase _database;
     public event EventHandler? HistoryChanged;
-    public SettingsWindow(SettingsService settings, ClipDatabase database) { InitializeComponent(); _settings=settings; _database=database; ShowGeneral(); AddAppearanceSettings(); }
+    public SettingsWindow(SettingsService settings, ClipDatabase database) { InitializeComponent(); _settings=settings; _database=database; ShowGeneralV2(); }
     private TextBlock Heading(string text) => new() { Text=text, FontSize=21, FontWeight=FontWeights.SemiBold, Margin=new Thickness(0,0,0,20) };
     private System.Windows.Controls.CheckBox Check(string text, Func<bool> get, Action<bool> set) { var c=new System.Windows.Controls.CheckBox { Content=text, IsChecked=get(), Margin=new Thickness(0,6,0,6), Foreground=(System.Windows.Media.Brush)FindResource("TextBrush") }; c.Checked += async (_,_)=>{set(true);await Save();};c.Unchecked += async (_,_)=>{set(false);await Save();};return c; }
     private TextBlock Info(string text) => new() { Text=text, TextWrapping=TextWrapping.Wrap, Foreground=(System.Windows.Media.Brush)FindResource("MutedBrush"), Margin=new Thickness(0,0,0,15) };
     private async Task Save() => await _settings.SaveAsync();
-    private void General_Click(object sender,RoutedEventArgs e) { ShowGeneral(); AddAppearanceSettings(); } private void History_Click(object sender,RoutedEventArgs e) => ShowHistoryWithCleanupOptions(); private void Privacy_Click(object sender,RoutedEventArgs e)=>ShowPrivacy(); private void Storage_Click(object sender,RoutedEventArgs e)=>ShowStorage(); private void About_Click(object sender,RoutedEventArgs e)=>ShowAbout();
+    private void General_Click(object sender,RoutedEventArgs e) => ShowGeneralV2(); private void History_Click(object sender,RoutedEventArgs e) => ShowHistoryWithCleanupOptions(); private void Privacy_Click(object sender,RoutedEventArgs e)=>ShowPrivacy(); private void Storage_Click(object sender,RoutedEventArgs e)=>ShowStorage(); private void About_Click(object sender,RoutedEventArgs e)=>ShowAbout();
     private void ShowGeneral()
     {
         ContentPanel.Children.Clear(); ContentPanel.Children.Add(Heading("General")); ContentPanel.Children.Add(Check("Iniciar Clipboard Pro con Windows",()=>_settings.Current.StartWithWindows,v=>{_settings.Current.StartWithWindows=v;StartupService.SetEnabled(v);})); ContentPanel.Children.Add(Check("Mantener Clipboard Pro activo en segundo plano",()=>_settings.Current.KeepRunning,v=>_settings.Current.KeepRunning=v)); ContentPanel.Children.Add(Check("Cerrar panel después de pegar",()=>_settings.Current.CloseAfterPaste,v=>_settings.Current.CloseAfterPaste=v)); ContentPanel.Children.Add(new TextBlock { Text="Apariencia", FontWeight=FontWeights.SemiBold, Margin=new Thickness(0,18,0,6) }); var appearance=new StackPanel { Orientation=Orientation.Horizontal }; foreach(var t in new[]{"System","Light","Dark"}) { var b=new Button { Content=t, Tag=t }; b.Click += async (_,_)=>{_settings.Current.Theme=(string)b.Tag; App.ApplyTheme(_settings.Current.Theme);await Save();};appearance.Children.Add(b); } ContentPanel.Children.Add(appearance); ContentPanel.Children.Add(Info("Atajo principal: Ctrl + Shift + V\nWin + V se reserva para el historial nativo de Windows y nunca se intercepta."));
+    }
+    private void ShowGeneralV2()
+    {
+        ContentPanel.Children.Clear(); ContentPanel.Children.Add(Heading("General"));
+        ContentPanel.Children.Add(Check("Iniciar Clipboard Pro con Windows",()=>_settings.Current.StartWithWindows,v=>{_settings.Current.StartWithWindows=v;StartupService.SetEnabled(v);}));
+        ContentPanel.Children.Add(Check("Mantener Clipboard Pro activo en segundo plano",()=>_settings.Current.KeepRunning,v=>_settings.Current.KeepRunning=v));
+        ContentPanel.Children.Add(Check("Cerrar panel después de pegar",()=>_settings.Current.CloseAfterPaste,v=>_settings.Current.CloseAfterPaste=v));
+        ContentPanel.Children.Add(new TextBlock { Text="Tema", FontWeight=FontWeights.SemiBold, Margin=new Thickness(0,20,0,7) });
+        ContentPanel.Children.Add(Info("Elige cómo se ve Clipboard Pro. Sistema sigue el modo de Windows."));
+        var themes=new StackPanel { Orientation=Orientation.Horizontal };
+        themes.Children.Add(ThemeButton("Sistema","System")); themes.Children.Add(ThemeButton("Claro","Light")); themes.Children.Add(ThemeButton("Oscuro","Dark")); ContentPanel.Children.Add(themes);
+        ContentPanel.Children.Add(new TextBlock { Text="Color de acento", FontWeight=FontWeights.SemiBold, Margin=new Thickness(0,22,0,7) });
+        ContentPanel.Children.Add(Info("Se aplica al instante a los resaltados y controles de la aplicación."));
+        var colors=new StackPanel { Orientation=Orientation.Horizontal };
+        foreach(var choice in new[]{("Violeta","#FF8B72FF"),("Verde","#FF2DBE96"),("Azul","#FF3989FF"),("Coral","#FFFF7A59"),("Dorado","#FFE9B949")}) colors.Children.Add(AccentButton(choice.Item1,choice.Item2));
+        ContentPanel.Children.Add(colors); ContentPanel.Children.Add(Info("El botón 📌 del panel principal contiene el anclaje y sus tamaños."));
+    }
+    private Button ThemeButton(string label,string value)
+    {
+        var selected=_settings.Current.Theme==value; var accent=(System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(_settings.Current.AccentColor)!;
+        var button=new Button { Content=label, Width=106, Height=36, Margin=new Thickness(0,0,8,0), FontWeight=selected?FontWeights.SemiBold:FontWeights.Normal, BorderThickness=selected?new Thickness(2):new Thickness(1), BorderBrush=selected?new System.Windows.Media.SolidColorBrush(accent):(System.Windows.Media.Brush)FindResource("BorderBrush"), Background=selected?new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromArgb(96,accent.R,accent.G,accent.B)):(System.Windows.Media.Brush)FindResource("SurfaceHoverBrush") };
+        button.Click += async (_,_)=> { _settings.Current.Theme=value; App.ApplyTheme(value); await Save(); ShowGeneralV2(); };
+        return button;
+    }
+    private Button AccentButton(string name,string color)
+    {
+        var selected=string.Equals(_settings.Current.AccentColor,color,StringComparison.OrdinalIgnoreCase); var brush=(System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString(color)!;
+        var button=new Button { Content=selected?"✓":string.Empty, ToolTip=name, Width=42, Height=36, Margin=new Thickness(0,0,8,0), Padding=new Thickness(0), FontSize=16, FontWeight=FontWeights.Bold, Foreground=System.Windows.Media.Brushes.White, Background=brush, BorderThickness=selected?new Thickness(3):new Thickness(1), BorderBrush=selected?(System.Windows.Media.Brush)FindResource("TextBrush"):(System.Windows.Media.Brush)FindResource("BorderBrush") };
+        button.Click += async (_,_)=> { _settings.Current.AccentColor=color; App.ApplyTheme(_settings.Current.Theme); await Save(); ShowGeneralV2(); };
+        return button;
     }
     private void AddAppearanceSettings()
     {

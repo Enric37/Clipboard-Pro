@@ -11,7 +11,7 @@
     <ApplicationIcon>Assets\ClipboardPro.ico</ApplicationIcon>
     <AssemblyName>ClipboardPro</AssemblyName>
     <RootNamespace>ClipboardPro</RootNamespace>
-    <Version>1.0.4</Version>
+    <Version>1.0.5</Version>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="Assets\ClipboardPro-512.png"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
