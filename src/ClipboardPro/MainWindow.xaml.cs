@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
 using ClipboardPro.Interop;
 using ClipboardPro.Models;
 using ClipboardPro.Services;
@@ -21,13 +22,23 @@ public partial class MainWindow : Window
     public async Task OpenAsync()
     {
         _previousWindow=NativeMethods.GetForegroundWindow(); await RefreshAsync();
-        if (!IsVisible) { if (_settings.Current.PanelPinned) PositionPinned(); else PositionNearCursor(); Show(); }
+        if (!IsVisible) { RestorePanelPosition(); Show(); }
         ApplyPanelPreferences(); Activate(); Focus(); SearchBox.Focus(); if (ClipList.Items.Count>0) ClipList.SelectedIndex=0;
     }
     private void PositionNearCursor()
     {
         var area=GetWorkArea(); var width=ActualWidth>0 ? ActualWidth : Width; var height=ActualHeight>0 ? ActualHeight : Height;
         Left=ClampToArea(area.Right-width-12,area.Left+12,area.Right-width-12); Top=ClampToArea(area.Bottom-height-12,area.Top+12,area.Bottom-height-12);
+    }
+    private void RestorePanelPosition()
+    {
+        if(_settings.Current.PanelLeft is double left && _settings.Current.PanelTop is double top) { Left=left; Top=top; KeepPanelWithinWorkArea(false); }
+        else PositionNearCursor();
+    }
+    private async Task SavePanelPositionAsync()
+    {
+        if(double.IsNaN(Left) || double.IsNaN(Top)) return;
+        _settings.Current.PanelLeft=Left; _settings.Current.PanelTop=Top; await _settings.SaveAsync();
     }
     private void PositionPinned()
     {
@@ -51,11 +62,11 @@ public partial class MainWindow : Window
                 var (width,height)=_settings.Current.PinnedPanelSize switch { "Compacto" => (520d,420d), "Amplio" => (960d,680d), _ => (780d,590d) };
                 var area=GetWorkArea(); Width=Math.Min(width,Math.Max(MinWidth,area.Width-24)); Height=Math.Min(height,Math.Max(MinHeight,area.Height-24)); _pinnedSizeInitialized=true;
             }
-            Topmost=true; ShowInTaskbar=true; KeepPanelWithinWorkArea(true);
+            Topmost=true; ShowInTaskbar=true; KeepPanelWithinWorkArea(false);
         }
         else { Topmost=false; ShowInTaskbar=false; _pinnedSizeInitialized=false; KeepPanelWithinWorkArea(false); }
     }
-    public void HidePanel() { if (IsVisible) Hide(); }
+    public void HidePanel() { _=SavePanelPositionAsync(); if (IsVisible) Hide(); }
     private async Task RefreshAsync(bool append=false, CancellationToken cancellationToken=default)
     {
         if (!append) { _items.Clear(); _loaded=0; }
@@ -86,7 +97,7 @@ public partial class MainWindow : Window
         else if (Keyboard.Modifiers==ModifierKeys.Control && e.Key==Key.D) { ToggleFavorite(); e.Handled=true; }
     }
     private void Window_Deactivated(object sender, EventArgs e) { if (!_openingSettings && !_panelOptionsOpen && !_settings.Current.PanelPinned) Dispatcher.BeginInvoke(HidePanel); }
-    private void Window_SizeChanged(object sender, SizeChangedEventArgs e) => KeepPanelWithinWorkArea(_settings.Current.PanelPinned);
+    private void Window_SizeChanged(object sender, SizeChangedEventArgs e) => KeepPanelWithinWorkArea(false);
     private void KeepPanelWithinWorkArea(bool pinned)
     {
         if(_adjustingBounds || !IsLoaded) return;
@@ -124,11 +135,21 @@ public partial class MainWindow : Window
         if (Selected is not { Type: ClipType.Text or ClipType.Code or ClipType.Url or ClipType.Color } item) return; var dialog=new EditClipWindow(item.Content){Owner=this}; if(dialog.ShowDialog()==true) { await _database.UpdateContentAsync(item.Id,dialog.Value); await RefreshAsync(); }
     }
     private void More_Click(object sender, RoutedEventArgs e) { if (Selected is null) return; var menu=ClipList.ContextMenu; menu.PlacementTarget=(Button)sender; menu.IsOpen=true; }
+    private async void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if(_settings.Current.PanelPinned || e.LeftButton!=MouseButtonState.Pressed || IsInteractiveControl(e.OriginalSource as DependencyObject)) return;
+        try { DragMove(); KeepPanelWithinWorkArea(false); await SavePanelPositionAsync(); } catch { }
+    }
+    private static bool IsInteractiveControl(DependencyObject? element)
+    {
+        for(var current=element; current is not null; current=VisualTreeHelper.GetParent(current)) if(current is Button or TextBox) return true;
+        return false;
+    }
     private void PanelOptions_Click(object sender, RoutedEventArgs e)
     {
         _panelOptionsOpen=true; var menu=new ContextMenu { Background=(System.Windows.Media.Brush)FindResource("SurfaceBrush"), Foreground=(System.Windows.Media.Brush)FindResource("TextBrush"), BorderBrush=(System.Windows.Media.Brush)FindResource("BorderBrush"), BorderThickness=new Thickness(1) }; menu.Closed += (_,_)=>_panelOptionsOpen=false;
         var anchor=new MenuItem { Header="Anclar panel arriba a la derecha", IsCheckable=true, IsChecked=_settings.Current.PanelPinned };
-        anchor.Click += async (_,_)=> { _settings.Current.PanelPinned=anchor.IsChecked; ApplyPanelPreferences(true); await _settings.SaveAsync(); };
+        anchor.Click += async (_,_)=> { _settings.Current.PanelPinned=anchor.IsChecked; ApplyPanelPreferences(); await SavePanelPositionAsync(); };
         menu.Items.Add(anchor); menu.Items.Add(new Separator());
         foreach(var size in new[]{"Compacto","Normal","Amplio"})
         {

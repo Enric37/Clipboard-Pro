@@ -10,6 +10,8 @@ public sealed class AppSettings
     public bool CloseAfterPaste { get; set; } = true;
     public bool PanelPinned { get; set; }
     public string PinnedPanelSize { get; set; } = "Normal";
+    public double? PanelLeft { get; set; }
+    public double? PanelTop { get; set; }
     public bool SaveImages { get; set; } = true;
     public bool SaveFiles { get; set; } = true;
     public bool SaveFormattedText { get; set; } = true;
