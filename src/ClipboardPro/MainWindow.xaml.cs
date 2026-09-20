@@ -27,11 +27,11 @@ public partial class MainWindow : Window
     private void PositionNearCursor()
     {
         var area=GetWorkArea(true); var width=ActualWidth>0 ? ActualWidth : Width; var height=ActualHeight>0 ? ActualHeight : Height;
-        Left=ClampToArea(area.Left+(area.Width-width)/2d,area.Left+12,area.Right-width-12); Top=ClampToArea(area.Bottom-height-72,area.Top+12,area.Bottom-height-12);
+        Left=ClampToArea(area.Right-width-12,area.Left+12,area.Right-width-12); Top=ClampToArea(area.Bottom-height-12,area.Top+12,area.Bottom-height-12);
     }
     private void PositionPinned()
     {
-        var area=GetWorkArea(); var width=ActualWidth>0 ? ActualWidth : Width; var height=ActualHeight>0 ? ActualHeight : Height;
+        var area=GetWorkArea(true); var width=ActualWidth>0 ? ActualWidth : Width; var height=ActualHeight>0 ? ActualHeight : Height;
         Left=ClampToArea(area.Right-width-12,area.Left+12,area.Right-width-12); Top=ClampToArea(area.Top+12,area.Top+12,area.Bottom-height-12);
     }
     private Rect GetWorkArea(bool cursorScreen=false)
