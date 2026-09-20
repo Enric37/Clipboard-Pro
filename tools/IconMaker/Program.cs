@@ -53,9 +53,16 @@ internal static class Program
     }
     private static void DrawMark(DrawingContext c)
     {
-        c.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(178,166,255)),null,new Rect(13,10,93,93),29,29);
-        c.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(124,92,255)),null,new Rect(22,22,94,94),29,29);
-        var cut=Geometry.Parse("M91,50 C84,44 76,41 67,41 C48,41 33,56 33,75 C33,94 48,109 67,109 C76,109 84,106 91,100 L80,88 C76,91 72,93 67,93 C57,93 49,85 49,75 C49,65 57,57 67,57 C72,57 76,59 80,62 Z");
-        c.DrawGeometry(new SolidColorBrush(Color.FromRgb(23,23,28)),null,cut);
+        var outer=new LinearGradientBrush(Color.FromRgb(151,125,255),Color.FromRgb(94,63,220),new Point(0,0),new Point(1,1));
+        c.DrawRoundedRectangle(outer,null,new Rect(6,6,116,116),34,34);
+        c.DrawRoundedRectangle(new SolidColorBrush(Color.FromArgb(42,255,255,255)),null,new Rect(13,12,102,102),29,29);
+
+        var paper=new SolidColorBrush(Color.FromRgb(250,249,255));
+        c.DrawRoundedRectangle(paper,null,new Rect(35,31,58,70),13,13);
+        c.DrawRoundedRectangle(new SolidColorBrush(Color.FromRgb(205,194,255)),null,new Rect(47,22,34,19),9,9);
+        var ink=new SolidColorBrush(Color.FromRgb(104,76,222));
+        c.DrawRoundedRectangle(ink,null,new Rect(47,55,34,7),3.5,3.5);
+        c.DrawRoundedRectangle(ink,null,new Rect(47,70,27,7),3.5,3.5);
+        c.DrawRoundedRectangle(ink,null,new Rect(47,85,20,7),3.5,3.5);
     }
 }

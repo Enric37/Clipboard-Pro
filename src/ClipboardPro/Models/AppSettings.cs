@@ -8,6 +8,8 @@ public sealed class AppSettings
     public bool StartWithWindows { get; set; }
     public bool KeepRunning { get; set; } = true;
     public bool CloseAfterPaste { get; set; } = true;
+    public bool PanelPinned { get; set; }
+    public string PinnedPanelSize { get; set; } = "Normal";
     public bool SaveImages { get; set; } = true;
     public bool SaveFiles { get; set; } = true;
     public bool SaveFormattedText { get; set; } = true;

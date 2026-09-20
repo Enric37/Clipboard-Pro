@@ -30,6 +30,8 @@ public sealed class ClipDatabase
             CREATE TRIGGER IF NOT EXISTS clips_au AFTER UPDATE OF content,source_process,collection ON clips BEGIN INSERT INTO clips_fts(clips_fts,rowid,content,source_process,collection) VALUES('delete',old.id,old.content,coalesce(old.source_process,''),coalesce(old.collection,'')); INSERT INTO clips_fts(rowid,content,source_process,collection) VALUES(new.id,new.content,coalesce(new.source_process,''),coalesce(new.collection,'')); END;
             """;
         await ExecuteAsync(c, sql);
+        await using var version=c.CreateCommand(); version.CommandText="PRAGMA user_version"; var currentVersion=Convert.ToInt32(await version.ExecuteScalarAsync() ?? 0);
+        if(currentVersion<2) { await ExecuteAsync(c,"INSERT INTO clips_fts(clips_fts) VALUES('rebuild'); PRAGMA user_version=2;"); }
     }
     public static string HashFor(ClipType type, string content, string? secondary = null)
     {
@@ -76,15 +78,52 @@ public sealed class ClipDatabase
     public async Task UpdateContentAsync(long id, string content)
     { await using var c = Open(); await c.OpenAsync(); await using var cmd = c.CreateCommand(); cmd.CommandText = "UPDATE clips SET content=$content, hash=$hash WHERE id=$id"; cmd.Parameters.AddWithValue("$content", content); cmd.Parameters.AddWithValue("$hash", HashFor(ClipType.Text, content)); cmd.Parameters.AddWithValue("$id", id); await cmd.ExecuteNonQueryAsync(); }
     public async Task MarkUsedAsync(long id) { await using var c = Open(); await c.OpenAsync(); await using var cmd = c.CreateCommand(); cmd.CommandText = "UPDATE clips SET use_count=use_count+1,last_used_utc=$now WHERE id=$id"; cmd.Parameters.AddWithValue("$id", id); cmd.Parameters.AddWithValue("$now", DateTime.UtcNow.ToString("O")); await cmd.ExecuteNonQueryAsync(); }
-    public async Task DeleteAsync(long id) { await using var c = Open(); await c.OpenAsync(); await using var cmd = c.CreateCommand(); cmd.CommandText = "DELETE FROM clips WHERE id=$id"; cmd.Parameters.AddWithValue("$id", id); await cmd.ExecuteNonQueryAsync(); }
+    public Task DeleteAsync(long id) => DeleteWhereAsync("id=$id", cmd => cmd.Parameters.AddWithValue("$id", id));
     public async Task CleanupAsync(AppSettings settings)
     {
         await using var c = Open(); await c.OpenAsync(); await using var cmd = c.CreateCommand();
         cmd.CommandText = "DELETE FROM clips WHERE favorite=0 AND pinned=0 AND (created_utc < $date OR id NOT IN (SELECT id FROM clips ORDER BY pinned DESC,favorite DESC,created_utc DESC LIMIT $max))";
         cmd.Parameters.AddWithValue("$date", DateTime.UtcNow.AddDays(-settings.HistoryDays).ToString("O")); cmd.Parameters.AddWithValue("$max", settings.MaxItems); await cmd.ExecuteNonQueryAsync();
     }
-    public async Task ClearAsync(DateTime? newerThan = null, bool preserveFavorites = true)
-    { await using var c = Open(); await c.OpenAsync(); await using var cmd = c.CreateCommand(); cmd.CommandText = $"DELETE FROM clips WHERE {(newerThan is null ? "1=1" : "created_utc >= $date")}{(preserveFavorites ? " AND favorite=0 AND pinned=0" : "")}"; if (newerThan is not null) cmd.Parameters.AddWithValue("$date", newerThan.Value.ToString("O")); await cmd.ExecuteNonQueryAsync(); }
+    public Task ClearAsync(DateTime? newerThan = null, bool preserveFavorites = true)
+    {
+        var where=(newerThan is null ? "1=1" : "created_utc >= $date") + (preserveFavorites ? " AND favorite=0" : "");
+        return DeleteWhereAsync(where, cmd => { if (newerThan is not null) cmd.Parameters.AddWithValue("$date", newerThan.Value.ToString("O")); });
+    }
+    public Task ClearFavoritesAsync() => DeleteWhereAsync("favorite=1", _ => { });
+    private async Task DeleteWhereAsync(string where, Action<SqliteCommand> bind)
+    {
+        var paths=new List<string>();
+        await using (var c=Open())
+        {
+            await c.OpenAsync();
+            await using (var select=c.CreateCommand())
+            {
+                select.CommandText=$"SELECT image_path,thumbnail_path FROM clips WHERE {where}"; bind(select);
+                await using var reader=await select.ExecuteReaderAsync();
+                while(await reader.ReadAsync()) { if(!reader.IsDBNull(0)) paths.Add(reader.GetString(0)); if(!reader.IsDBNull(1)) paths.Add(reader.GetString(1)); }
+            }
+            await using var delete=c.CreateCommand(); delete.CommandText=$"DELETE FROM clips WHERE {where}"; bind(delete); await delete.ExecuteNonQueryAsync();
+        }
+        DeleteStoredFiles(paths); await DeleteOrphanedImageFilesAsync();
+    }
+    private static void DeleteStoredFiles(IEnumerable<string> paths)
+    {
+        var root=Path.GetFullPath(Branding.ImageDirectory).TrimEnd(Path.DirectorySeparatorChar,Path.AltDirectorySeparatorChar)+Path.DirectorySeparatorChar;
+        foreach(var path in paths.Distinct(StringComparer.OrdinalIgnoreCase)) try { var full=Path.GetFullPath(path); if(full.StartsWith(root,StringComparison.OrdinalIgnoreCase) && File.Exists(full)) File.Delete(full); } catch { }
+    }
+    private async Task DeleteOrphanedImageFilesAsync()
+    {
+        if(!Directory.Exists(Branding.ImageDirectory)) return;
+        var referenced=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using(var c=Open())
+        {
+            await c.OpenAsync(); await using var cmd=c.CreateCommand(); cmd.CommandText="SELECT image_path,thumbnail_path FROM clips WHERE image_path IS NOT NULL OR thumbnail_path IS NOT NULL";
+            await using var reader=await cmd.ExecuteReaderAsync();
+            while(await reader.ReadAsync()) { if(!reader.IsDBNull(0)) referenced.Add(Path.GetFullPath(reader.GetString(0))); if(!reader.IsDBNull(1)) referenced.Add(Path.GetFullPath(reader.GetString(1))); }
+        }
+        var files=Directory.EnumerateFiles(Branding.ImageDirectory,"*.png",SearchOption.TopDirectoryOnly).Where(path=>!referenced.Contains(Path.GetFullPath(path))).ToArray(); DeleteStoredFiles(files);
+    }
     private SqliteConnection Open() => new(_connectionString);
     private static async Task ExecuteAsync(SqliteConnection connection, string sql) { await using var cmd = connection.CreateCommand(); cmd.CommandText = sql; await cmd.ExecuteNonQueryAsync(); }
     private static void Bind(SqliteCommand c, ClipItem x) { c.Parameters.AddWithValue("$type", (int)x.Type); c.Parameters.AddWithValue("$content", x.Content); c.Parameters.AddWithValue("$html", (object?)x.Html ?? DBNull.Value); c.Parameters.AddWithValue("$rtf", (object?)x.Rtf ?? DBNull.Value); c.Parameters.AddWithValue("$image", (object?)x.ImagePath ?? DBNull.Value); c.Parameters.AddWithValue("$thumb", (object?)x.ThumbnailPath ?? DBNull.Value); c.Parameters.AddWithValue("$metadata", (object?)x.Metadata ?? DBNull.Value); c.Parameters.AddWithValue("$process", (object?)x.SourceProcess ?? DBNull.Value); c.Parameters.AddWithValue("$source", (object?)x.SourcePath ?? DBNull.Value); c.Parameters.AddWithValue("$created", x.CreatedUtc.ToString("O")); c.Parameters.AddWithValue("$used", x.LastUsedUtc.ToString("O")); c.Parameters.AddWithValue("$collection", (object?)x.Collection ?? DBNull.Value); c.Parameters.AddWithValue("$hash", x.Hash); }

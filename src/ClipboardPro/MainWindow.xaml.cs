@@ -15,30 +15,46 @@ public partial class MainWindow : Window
     private CancellationTokenSource? _searchCts; private ClipType? _type; private bool _favorites; private int _loaded; private IntPtr _previousWindow; private bool _openingSettings;
     public MainWindow(ClipDatabase database, ClipboardCaptureService clipboard, SettingsService settings)
     {
-        InitializeComponent(); _database=database; _clipboard=clipboard; _settings=settings; ClipList.ItemsSource=_items; AllFilter.Background = (System.Windows.Media.Brush)FindResource("SurfaceHoverBrush");
+        InitializeComponent(); _database=database; _clipboard=clipboard; _settings=settings; ClipList.ItemsSource=_items; AllFilter.Background = (System.Windows.Media.Brush)FindResource("SurfaceHoverBrush"); ApplyPanelPreferences();
     }
     public async Task OpenAsync()
     {
         _previousWindow=NativeMethods.GetForegroundWindow(); await RefreshAsync();
-        if (!IsVisible) { PositionNearCursor(); Show(); }
-        Activate(); Topmost=true; Topmost=false; Focus(); SearchBox.Focus(); if (ClipList.Items.Count>0) ClipList.SelectedIndex=0;
+        if (!IsVisible) { if (_settings.Current.PanelPinned) PositionPinned(); else PositionNearCursor(); Show(); }
+        ApplyPanelPreferences(); Activate(); Focus(); SearchBox.Focus(); if (ClipList.Items.Count>0) ClipList.SelectedIndex=0;
     }
     private void PositionNearCursor()
     {
         var screen=System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position); var area=screen.WorkingArea;
         Left=area.Left + Math.Max(12,(area.Width-Width)/2d); Top=area.Top+Math.Max(12,(area.Height-Height)/2d-35);
     }
+    private void PositionPinned()
+    {
+        var area=System.Windows.Forms.Screen.PrimaryScreen?.WorkingArea ?? System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position).WorkingArea;
+        Left=Math.Max(area.Left+12,area.Right-Width-12); Top=area.Top+12;
+    }
+    public void ApplyPanelPreferences()
+    {
+        if (_settings.Current.PanelPinned)
+        {
+            var (width,height)=_settings.Current.PinnedPanelSize switch { "Compacto" => (640d,440d), "Amplio" => (960d,680d), _ => (780d,590d) };
+            Width=Math.Min(width,SystemParameters.WorkArea.Width-24); Height=Math.Min(height,SystemParameters.WorkArea.Height-24);
+            Topmost=true; ShowInTaskbar=true; if (IsVisible) PositionPinned();
+        }
+        else { Topmost=false; ShowInTaskbar=false; }
+    }
     public void HidePanel() { if (IsVisible) Hide(); }
-    private async Task RefreshAsync(bool append=false)
+    private async Task RefreshAsync(bool append=false, CancellationToken cancellationToken=default)
     {
         if (!append) { _items.Clear(); _loaded=0; }
-        try { var result=await _database.SearchAsync(SearchBox?.Text, _type, _favorites, _loaded, 100); foreach(var item in result) _items.Add(item); _loaded += result.Count; EmptyState.Visibility=_items.Count==0?Visibility.Visible:Visibility.Collapsed; }
+        try { var result=await _database.SearchAsync(SearchBox?.Text, _type, _favorites, _loaded, 100, cancellationToken); cancellationToken.ThrowIfCancellationRequested(); foreach(var item in result) _items.Add(item); _loaded += result.Count; EmptyState.Visibility=_items.Count==0?Visibility.Visible:Visibility.Collapsed; }
+        catch (OperationCanceledException) { }
         catch { EmptyState.Visibility=Visibility.Visible; }
     }
     private async void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         SearchHint.Visibility=string.IsNullOrEmpty(SearchBox.Text)?Visibility.Visible:Visibility.Collapsed; _searchCts?.Cancel(); var cts=_searchCts=new();
-        try { await Task.Delay(80,cts.Token); if (!cts.IsCancellationRequested) await RefreshAsync(); } catch (TaskCanceledException) { }
+        try { await Task.Delay(80,cts.Token); if (!cts.IsCancellationRequested) await RefreshAsync(false,cts.Token); } catch (TaskCanceledException) { }
     }
     private async void Filter_Click(object sender, RoutedEventArgs e)
     {
@@ -57,7 +73,8 @@ public partial class MainWindow : Window
         else if (Keyboard.Modifiers==ModifierKeys.Control && e.Key==Key.F) { SearchBox.Focus(); SearchBox.SelectAll(); e.Handled=true; }
         else if (Keyboard.Modifiers==ModifierKeys.Control && e.Key==Key.D) { ToggleFavorite(); e.Handled=true; }
     }
-    private void Window_Deactivated(object sender, EventArgs e) { if (!_openingSettings) Dispatcher.BeginInvoke(HidePanel); }
+    private void Window_Deactivated(object sender, EventArgs e) { if (!_openingSettings && !_settings.Current.PanelPinned) Dispatcher.BeginInvoke(HidePanel); }
+    private void Window_SizeChanged(object sender, SizeChangedEventArgs e) { if (IsVisible && _settings.Current.PanelPinned) PositionPinned(); }
     private void Copy_Click(object sender, RoutedEventArgs e) => CopySelected();
     private void CopySelected()
     {
@@ -84,7 +101,7 @@ public partial class MainWindow : Window
     private void More_Click(object sender, RoutedEventArgs e) { if (Selected is null) return; var menu=ClipList.ContextMenu; menu.PlacementTarget=(Button)sender; menu.IsOpen=true; }
     public void OpenSettings()
     {
-        _openingSettings=true; var dialog=new SettingsWindow(_settings,_database){Owner=this}; dialog.Closed += (_,_) => { _openingSettings=false; }; dialog.ShowDialog();
+        _openingSettings=true; var dialog=new SettingsWindow(_settings,_database){Owner=this}; dialog.PanelPreferencesChanged += (_,_)=>ApplyPanelPreferences(); dialog.HistoryChanged += async (_,_)=>await RefreshAsync(); dialog.Closed += (_,_) => { _openingSettings=false; }; dialog.ShowDialog();
     }
     private void Settings_Click(object sender, RoutedEventArgs e) => OpenSettings();
 }

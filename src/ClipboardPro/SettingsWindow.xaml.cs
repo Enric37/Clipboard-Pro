@@ -9,15 +9,47 @@ namespace ClipboardPro;
 public partial class SettingsWindow : Window
 {
     private readonly SettingsService _settings; private readonly ClipDatabase _database;
-    public SettingsWindow(SettingsService settings, ClipDatabase database) { InitializeComponent(); _settings=settings; _database=database; ShowGeneral(); }
+    public event EventHandler? PanelPreferencesChanged;
+    public event EventHandler? HistoryChanged;
+    public SettingsWindow(SettingsService settings, ClipDatabase database) { InitializeComponent(); _settings=settings; _database=database; ShowGeneral(); AddPanelSettings(); }
     private TextBlock Heading(string text) => new() { Text=text, FontSize=21, FontWeight=FontWeights.SemiBold, Margin=new Thickness(0,0,0,20) };
     private System.Windows.Controls.CheckBox Check(string text, Func<bool> get, Action<bool> set) { var c=new System.Windows.Controls.CheckBox { Content=text, IsChecked=get(), Margin=new Thickness(0,6,0,6), Foreground=(System.Windows.Media.Brush)FindResource("TextBrush") }; c.Checked += async (_,_)=>{set(true);await Save();};c.Unchecked += async (_,_)=>{set(false);await Save();};return c; }
     private TextBlock Info(string text) => new() { Text=text, TextWrapping=TextWrapping.Wrap, Foreground=(System.Windows.Media.Brush)FindResource("MutedBrush"), Margin=new Thickness(0,0,0,15) };
     private async Task Save() => await _settings.SaveAsync();
-    private void General_Click(object sender,RoutedEventArgs e)=>ShowGeneral(); private void History_Click(object sender,RoutedEventArgs e)=>ShowHistory(); private void Privacy_Click(object sender,RoutedEventArgs e)=>ShowPrivacy(); private void Storage_Click(object sender,RoutedEventArgs e)=>ShowStorage(); private void About_Click(object sender,RoutedEventArgs e)=>ShowAbout();
+    private void General_Click(object sender,RoutedEventArgs e) { ShowGeneral(); AddPanelSettings(); } private void History_Click(object sender,RoutedEventArgs e) => ShowHistoryWithCleanupOptions(); private void Privacy_Click(object sender,RoutedEventArgs e)=>ShowPrivacy(); private void Storage_Click(object sender,RoutedEventArgs e)=>ShowStorage(); private void About_Click(object sender,RoutedEventArgs e)=>ShowAbout();
     private void ShowGeneral()
     {
         ContentPanel.Children.Clear(); ContentPanel.Children.Add(Heading("General")); ContentPanel.Children.Add(Check("Iniciar Clipboard Pro con Windows",()=>_settings.Current.StartWithWindows,v=>{_settings.Current.StartWithWindows=v;StartupService.SetEnabled(v);})); ContentPanel.Children.Add(Check("Mantener Clipboard Pro activo en segundo plano",()=>_settings.Current.KeepRunning,v=>_settings.Current.KeepRunning=v)); ContentPanel.Children.Add(Check("Cerrar panel después de pegar",()=>_settings.Current.CloseAfterPaste,v=>_settings.Current.CloseAfterPaste=v)); ContentPanel.Children.Add(new TextBlock { Text="Apariencia", FontWeight=FontWeights.SemiBold, Margin=new Thickness(0,18,0,6) }); var appearance=new StackPanel { Orientation=Orientation.Horizontal }; foreach(var t in new[]{"System","Light","Dark"}) { var b=new Button { Content=t, Tag=t }; b.Click += async (_,_)=>{_settings.Current.Theme=(string)b.Tag; App.ApplyTheme(_settings.Current.Theme);await Save();};appearance.Children.Add(b); } ContentPanel.Children.Add(appearance); ContentPanel.Children.Add(Info("Atajo principal: Ctrl + Shift + V\nWin + V se reserva para el historial nativo de Windows y nunca se intercepta."));
+    }
+    private void AddPanelSettings()
+    {
+        ContentPanel.Children.Add(new TextBlock { Text="Panel anclado", FontWeight=FontWeights.SemiBold, Margin=new Thickness(0,18,0,2) });
+        ContentPanel.Children.Add(Check("Mantener el panel sobre las demás ventanas",()=>_settings.Current.PanelPinned,v=>{_settings.Current.PanelPinned=v;PanelPreferencesChanged?.Invoke(this,EventArgs.Empty);}));
+        ContentPanel.Children.Add(Info("Al anclarlo se coloca arriba a la derecha y permanece visible mientras usas otras aplicaciones."));
+        var sizeRow=new StackPanel { Orientation=Orientation.Horizontal, Margin=new Thickness(0,0,0,10) };
+        sizeRow.Children.Add(new TextBlock { Text="Tamaño:", VerticalAlignment=VerticalAlignment.Center, Margin=new Thickness(0,0,10,0) });
+        var size=new ComboBox { Width=145, Background=(System.Windows.Media.Brush)FindResource("SurfaceHoverBrush"), Foreground=(System.Windows.Media.Brush)FindResource("TextBrush") };
+        size.Items.Add("Compacto"); size.Items.Add("Normal"); size.Items.Add("Amplio"); size.SelectedItem=_settings.Current.PinnedPanelSize; if(size.SelectedIndex<0) size.SelectedItem="Normal";
+        size.SelectionChanged += async (_,_)=>{if(size.SelectedItem is string selected){_settings.Current.PinnedPanelSize=selected;PanelPreferencesChanged?.Invoke(this,EventArgs.Empty);await Save();}};
+        sizeRow.Children.Add(size); ContentPanel.Children.Add(sizeRow);
+    }
+    private void AddClearFavoritesButton()
+    {
+        ContentPanel.Children.Add(Info("Al limpiar el historial se conservan únicamente los favoritos; los elementos fijados sin favorito también se eliminan."));
+        var clearFavorites=new Button { Content="Limpiar favoritos", HorizontalAlignment=HorizontalAlignment.Left, Margin=new Thickness(0,4,0,0) };
+        clearFavorites.Click += async (_,_)=>{if(MessageBox.Show("Se eliminarán todos los favoritos, incluidos sus archivos e imágenes guardados.",Branding.AppName,MessageBoxButton.OKCancel,MessageBoxImage.Warning)==MessageBoxResult.OK) { await _database.ClearFavoritesAsync(); HistoryChanged?.Invoke(this,EventArgs.Empty); }};
+        ContentPanel.Children.Add(clearFavorites);
+    }
+    private void ShowHistoryWithCleanupOptions()
+    {
+        ContentPanel.Children.Clear(); ContentPanel.Children.Add(Heading("Historial"));
+        ContentPanel.Children.Add(Check("Guardar imágenes",()=>_settings.Current.SaveImages,v=>_settings.Current.SaveImages=v));
+        ContentPanel.Children.Add(Check("Guardar archivos y carpetas",()=>_settings.Current.SaveFiles,v=>_settings.Current.SaveFiles=v));
+        ContentPanel.Children.Add(Check("Conservar HTML y RTF",()=>_settings.Current.SaveFormattedText,v=>_settings.Current.SaveFormattedText=v));
+        ContentPanel.Children.Add(Check("Permitir duplicados",()=>_settings.Current.AllowDuplicates,v=>_settings.Current.AllowDuplicates=v));
+        var clear=new Button { Content="Limpiar historial", HorizontalAlignment=HorizontalAlignment.Left, Margin=new Thickness(0,18,0,0) };
+        clear.Click += async (_,_)=>{if(MessageBox.Show("Se eliminará todo el historial, incluidos los archivos e imágenes guardados. Solo se conservarán los favoritos.",Branding.AppName,MessageBoxButton.OKCancel,MessageBoxImage.Warning)==MessageBoxResult.OK) { await _database.ClearAsync(); HistoryChanged?.Invoke(this,EventArgs.Empty); }};
+        ContentPanel.Children.Add(clear); AddClearFavoritesButton();
     }
     private void ShowHistory()
     {

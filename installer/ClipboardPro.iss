@@ -1,6 +1,6 @@
 ; Build with Inno Setup 6. This creates a per-user install and a clean uninstaller.
 #define AppName "Clipboard Pro"
-#define AppVersion "1.0.2"
+#define AppVersion "1.0.3"
 #define AppExeName "ClipboardPro.exe"
 [Setup]
 AppId={{8BC88A28-B048-4EC6-A8CB-66EF8D1549E5}
@@ -18,6 +18,7 @@ WizardStyle=modern
 SetupIconFile=..\src\ClipboardPro\Assets\ClipboardPro.ico
 WizardImageFile=..\src\ClipboardPro\Assets\InstallerWizard.bmp
 WizardSmallImageFile=..\src\ClipboardPro\Assets\InstallerWizardSmall.bmp
+CloseApplications=yes
 [Files]
 Source: "..\src\ClipboardPro\bin\Release\net8.0-windows\win-x64\publish\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 [Tasks]

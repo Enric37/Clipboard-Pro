@@ -17,6 +17,7 @@ public sealed class ClipItem
     public int UseCount { get; set; }
     public bool IsFavorite { get; set; }
     public bool IsPinned { get; set; }
+    public bool IsImage => Type == ClipType.Image;
     public string? Collection { get; set; }
     public string Hash { get; set; } = string.Empty;
     public bool IsAvailable => Type != ClipType.Files || Content.Split('\n').Any(File.Exists);
