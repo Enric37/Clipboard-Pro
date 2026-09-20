@@ -13,10 +13,10 @@ namespace ClipboardPro;
 public partial class MainWindow : Window
 {
     private readonly ClipDatabase _database; private readonly ClipboardCaptureService _clipboard; private readonly SettingsService _settings; private readonly ObservableCollection<ClipItem> _items = new();
-    private CancellationTokenSource? _searchCts; private ClipType? _type; private bool _favorites; private int _loaded; private IntPtr _previousWindow; private bool _openingSettings; private bool _panelOptionsOpen;
+    private CancellationTokenSource? _searchCts; private ClipType? _type; private bool _favorites; private int _loaded; private IntPtr _previousWindow; private bool _openingSettings; private bool _panelOptionsOpen; private bool _adjustingBounds; private bool _pinnedSizeInitialized;
     public MainWindow(ClipDatabase database, ClipboardCaptureService clipboard, SettingsService settings)
     {
-        InitializeComponent(); _database=database; _clipboard=clipboard; _settings=settings; ClipList.ItemsSource=_items; AllFilter.Background = (System.Windows.Media.Brush)FindResource("SurfaceHoverBrush"); ApplyPanelPreferences();
+        InitializeComponent(); _database=database; _clipboard=clipboard; _settings=settings; ClipList.ItemsSource=_items; AllFilter.Background = (System.Windows.Media.Brush)FindResource("SurfaceHoverBrush"); ApplyPanelPreferences(true);
     }
     public async Task OpenAsync()
     {
@@ -26,7 +26,7 @@ public partial class MainWindow : Window
     }
     private void PositionNearCursor()
     {
-        var area=GetWorkArea(true); var width=ActualWidth>0 ? ActualWidth : Width; var height=ActualHeight>0 ? ActualHeight : Height;
+        var area=GetWorkArea(); var width=ActualWidth>0 ? ActualWidth : Width; var height=ActualHeight>0 ? ActualHeight : Height;
         Left=ClampToArea(area.Right-width-12,area.Left+12,area.Right-width-12); Top=ClampToArea(area.Bottom-height-12,area.Top+12,area.Bottom-height-12);
     }
     private void PositionPinned()
@@ -42,15 +42,18 @@ public partial class MainWindow : Window
         return new Rect(topLeft,bottomRight);
     }
     private static double ClampToArea(double value,double minimum,double maximum) => maximum<minimum ? minimum : Math.Min(Math.Max(value,minimum),maximum);
-    public void ApplyPanelPreferences()
+    public void ApplyPanelPreferences(bool applyPresetSize=false)
     {
         if (_settings.Current.PanelPinned)
         {
-            var (width,height)=_settings.Current.PinnedPanelSize switch { "Compacto" => (520d,420d), "Amplio" => (960d,680d), _ => (780d,590d) };
-            var area=GetWorkArea(); Width=Math.Min(width,Math.Max(MinWidth,area.Width-24)); Height=Math.Min(height,Math.Max(MinHeight,area.Height-24));
-            Topmost=true; ShowInTaskbar=true; if (IsVisible) PositionPinned();
+            if(applyPresetSize || !_pinnedSizeInitialized)
+            {
+                var (width,height)=_settings.Current.PinnedPanelSize switch { "Compacto" => (520d,420d), "Amplio" => (960d,680d), _ => (780d,590d) };
+                var area=GetWorkArea(); Width=Math.Min(width,Math.Max(MinWidth,area.Width-24)); Height=Math.Min(height,Math.Max(MinHeight,area.Height-24)); _pinnedSizeInitialized=true;
+            }
+            Topmost=true; ShowInTaskbar=true; KeepPanelWithinWorkArea(true);
         }
-        else { Topmost=false; ShowInTaskbar=false; }
+        else { Topmost=false; ShowInTaskbar=false; _pinnedSizeInitialized=false; KeepPanelWithinWorkArea(false); }
     }
     public void HidePanel() { if (IsVisible) Hide(); }
     private async Task RefreshAsync(bool append=false, CancellationToken cancellationToken=default)
@@ -83,7 +86,20 @@ public partial class MainWindow : Window
         else if (Keyboard.Modifiers==ModifierKeys.Control && e.Key==Key.D) { ToggleFavorite(); e.Handled=true; }
     }
     private void Window_Deactivated(object sender, EventArgs e) { if (!_openingSettings && !_panelOptionsOpen && !_settings.Current.PanelPinned) Dispatcher.BeginInvoke(HidePanel); }
-    private void Window_SizeChanged(object sender, SizeChangedEventArgs e) { if (IsVisible && _settings.Current.PanelPinned) PositionPinned(); }
+    private void Window_SizeChanged(object sender, SizeChangedEventArgs e) => KeepPanelWithinWorkArea(_settings.Current.PanelPinned);
+    private void KeepPanelWithinWorkArea(bool pinned)
+    {
+        if(_adjustingBounds || !IsLoaded) return;
+        _adjustingBounds=true;
+        try
+        {
+            var area=GetWorkArea(!pinned); var maxWidth=Math.Max(MinWidth,area.Width-24); var maxHeight=Math.Max(MinHeight,area.Height-24);
+            if(Width>maxWidth) Width=maxWidth; if(Height>maxHeight) Height=maxHeight;
+            var width=ActualWidth>0 ? ActualWidth : Width; var height=ActualHeight>0 ? ActualHeight : Height;
+            if(pinned) PositionPinned(); else { Left=ClampToArea(Left,area.Left+12,area.Right-width-12); Top=ClampToArea(Top,area.Top+12,area.Bottom-height-12); }
+        }
+        finally { _adjustingBounds=false; }
+    }
     private void Copy_Click(object sender, RoutedEventArgs e) => CopySelected();
     private void CopySelected()
     {
@@ -112,12 +128,12 @@ public partial class MainWindow : Window
     {
         _panelOptionsOpen=true; var menu=new ContextMenu { Background=(System.Windows.Media.Brush)FindResource("SurfaceBrush"), Foreground=(System.Windows.Media.Brush)FindResource("TextBrush"), BorderBrush=(System.Windows.Media.Brush)FindResource("BorderBrush"), BorderThickness=new Thickness(1) }; menu.Closed += (_,_)=>_panelOptionsOpen=false;
         var anchor=new MenuItem { Header="Anclar panel arriba a la derecha", IsCheckable=true, IsChecked=_settings.Current.PanelPinned };
-        anchor.Click += async (_,_)=> { _settings.Current.PanelPinned=anchor.IsChecked; ApplyPanelPreferences(); await _settings.SaveAsync(); };
+        anchor.Click += async (_,_)=> { _settings.Current.PanelPinned=anchor.IsChecked; ApplyPanelPreferences(true); await _settings.SaveAsync(); };
         menu.Items.Add(anchor); menu.Items.Add(new Separator());
         foreach(var size in new[]{"Compacto","Normal","Amplio"})
         {
             var option=new MenuItem { Header=$"Tamaño: {size}", IsCheckable=true, IsChecked=_settings.Current.PinnedPanelSize==size };
-            option.Click += async (_,_)=> { _settings.Current.PinnedPanelSize=size; _settings.Current.PanelPinned=true; ApplyPanelPreferences(); await _settings.SaveAsync(); };
+            option.Click += async (_,_)=> { _settings.Current.PinnedPanelSize=size; _settings.Current.PanelPinned=true; ApplyPanelPreferences(true); await _settings.SaveAsync(); };
             menu.Items.Add(option);
         }
         menu.PlacementTarget=(Button)sender; menu.IsOpen=true;
