@@ -9,29 +9,28 @@ namespace ClipboardPro;
 public partial class SettingsWindow : Window
 {
     private readonly SettingsService _settings; private readonly ClipDatabase _database;
-    public event EventHandler? PanelPreferencesChanged;
     public event EventHandler? HistoryChanged;
-    public SettingsWindow(SettingsService settings, ClipDatabase database) { InitializeComponent(); _settings=settings; _database=database; ShowGeneral(); AddPanelSettings(); }
+    public SettingsWindow(SettingsService settings, ClipDatabase database) { InitializeComponent(); _settings=settings; _database=database; ShowGeneral(); AddAppearanceSettings(); }
     private TextBlock Heading(string text) => new() { Text=text, FontSize=21, FontWeight=FontWeights.SemiBold, Margin=new Thickness(0,0,0,20) };
     private System.Windows.Controls.CheckBox Check(string text, Func<bool> get, Action<bool> set) { var c=new System.Windows.Controls.CheckBox { Content=text, IsChecked=get(), Margin=new Thickness(0,6,0,6), Foreground=(System.Windows.Media.Brush)FindResource("TextBrush") }; c.Checked += async (_,_)=>{set(true);await Save();};c.Unchecked += async (_,_)=>{set(false);await Save();};return c; }
     private TextBlock Info(string text) => new() { Text=text, TextWrapping=TextWrapping.Wrap, Foreground=(System.Windows.Media.Brush)FindResource("MutedBrush"), Margin=new Thickness(0,0,0,15) };
     private async Task Save() => await _settings.SaveAsync();
-    private void General_Click(object sender,RoutedEventArgs e) { ShowGeneral(); AddPanelSettings(); } private void History_Click(object sender,RoutedEventArgs e) => ShowHistoryWithCleanupOptions(); private void Privacy_Click(object sender,RoutedEventArgs e)=>ShowPrivacy(); private void Storage_Click(object sender,RoutedEventArgs e)=>ShowStorage(); private void About_Click(object sender,RoutedEventArgs e)=>ShowAbout();
+    private void General_Click(object sender,RoutedEventArgs e) { ShowGeneral(); AddAppearanceSettings(); } private void History_Click(object sender,RoutedEventArgs e) => ShowHistoryWithCleanupOptions(); private void Privacy_Click(object sender,RoutedEventArgs e)=>ShowPrivacy(); private void Storage_Click(object sender,RoutedEventArgs e)=>ShowStorage(); private void About_Click(object sender,RoutedEventArgs e)=>ShowAbout();
     private void ShowGeneral()
     {
         ContentPanel.Children.Clear(); ContentPanel.Children.Add(Heading("General")); ContentPanel.Children.Add(Check("Iniciar Clipboard Pro con Windows",()=>_settings.Current.StartWithWindows,v=>{_settings.Current.StartWithWindows=v;StartupService.SetEnabled(v);})); ContentPanel.Children.Add(Check("Mantener Clipboard Pro activo en segundo plano",()=>_settings.Current.KeepRunning,v=>_settings.Current.KeepRunning=v)); ContentPanel.Children.Add(Check("Cerrar panel después de pegar",()=>_settings.Current.CloseAfterPaste,v=>_settings.Current.CloseAfterPaste=v)); ContentPanel.Children.Add(new TextBlock { Text="Apariencia", FontWeight=FontWeights.SemiBold, Margin=new Thickness(0,18,0,6) }); var appearance=new StackPanel { Orientation=Orientation.Horizontal }; foreach(var t in new[]{"System","Light","Dark"}) { var b=new Button { Content=t, Tag=t }; b.Click += async (_,_)=>{_settings.Current.Theme=(string)b.Tag; App.ApplyTheme(_settings.Current.Theme);await Save();};appearance.Children.Add(b); } ContentPanel.Children.Add(appearance); ContentPanel.Children.Add(Info("Atajo principal: Ctrl + Shift + V\nWin + V se reserva para el historial nativo de Windows y nunca se intercepta."));
     }
-    private void AddPanelSettings()
+    private void AddAppearanceSettings()
     {
-        ContentPanel.Children.Add(new TextBlock { Text="Panel anclado", FontWeight=FontWeights.SemiBold, Margin=new Thickness(0,18,0,2) });
-        ContentPanel.Children.Add(Check("Mantener el panel sobre las demás ventanas",()=>_settings.Current.PanelPinned,v=>{_settings.Current.PanelPinned=v;PanelPreferencesChanged?.Invoke(this,EventArgs.Empty);}));
-        ContentPanel.Children.Add(Info("Al anclarlo se coloca arriba a la derecha y permanece visible mientras usas otras aplicaciones."));
-        var sizeRow=new StackPanel { Orientation=Orientation.Horizontal, Margin=new Thickness(0,0,0,10) };
-        sizeRow.Children.Add(new TextBlock { Text="Tamaño:", VerticalAlignment=VerticalAlignment.Center, Margin=new Thickness(0,0,10,0) });
-        var size=new ComboBox { Width=145, Background=(System.Windows.Media.Brush)FindResource("SurfaceHoverBrush"), Foreground=(System.Windows.Media.Brush)FindResource("TextBrush") };
-        size.Items.Add("Compacto"); size.Items.Add("Normal"); size.Items.Add("Amplio"); size.SelectedItem=_settings.Current.PinnedPanelSize; if(size.SelectedIndex<0) size.SelectedItem="Normal";
-        size.SelectionChanged += async (_,_)=>{if(size.SelectedItem is string selected){_settings.Current.PinnedPanelSize=selected;PanelPreferencesChanged?.Invoke(this,EventArgs.Empty);await Save();}};
-        sizeRow.Children.Add(size); ContentPanel.Children.Add(sizeRow);
+        ContentPanel.Children.Add(new TextBlock { Text="Color de acento", FontWeight=FontWeights.SemiBold, Margin=new Thickness(0,18,0,6) });
+        var colors=new StackPanel { Orientation=Orientation.Horizontal };
+        foreach(var color in new[]{"#FF8B72FF","#FF2DBE96","#FF3989FF","#FFFF7A59","#FFE9B949"})
+        {
+            var button=new Button { Width=34, Height=30, Margin=new Thickness(0,0,6,0), Background=(System.Windows.Media.Brush)new System.Windows.Media.BrushConverter().ConvertFromString(color)! };
+            button.Click += async (_,_)=> { _settings.Current.AccentColor=color; App.ApplyTheme(_settings.Current.Theme); await Save(); };
+            colors.Children.Add(button);
+        }
+        ContentPanel.Children.Add(colors); ContentPanel.Children.Add(Info("El color se aplica al instante a los controles y resaltados."));
     }
     private void AddClearFavoritesButton()
     {

@@ -3,6 +3,7 @@
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries><ResourceDictionary Source="Resources/Theme.xaml"/></ResourceDictionary.MergedDictionaries>
       <local:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+      <local:ThumbnailPathToImageConverter x:Key="ThumbnailPathToImage" />
     </ResourceDictionary>
   </Application.Resources>
 </Application>

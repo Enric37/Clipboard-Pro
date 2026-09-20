@@ -12,7 +12,7 @@ namespace ClipboardPro;
 public partial class MainWindow : Window
 {
     private readonly ClipDatabase _database; private readonly ClipboardCaptureService _clipboard; private readonly SettingsService _settings; private readonly ObservableCollection<ClipItem> _items = new();
-    private CancellationTokenSource? _searchCts; private ClipType? _type; private bool _favorites; private int _loaded; private IntPtr _previousWindow; private bool _openingSettings;
+    private CancellationTokenSource? _searchCts; private ClipType? _type; private bool _favorites; private int _loaded; private IntPtr _previousWindow; private bool _openingSettings; private bool _panelOptionsOpen;
     public MainWindow(ClipDatabase database, ClipboardCaptureService clipboard, SettingsService settings)
     {
         InitializeComponent(); _database=database; _clipboard=clipboard; _settings=settings; ClipList.ItemsSource=_items; AllFilter.Background = (System.Windows.Media.Brush)FindResource("SurfaceHoverBrush"); ApplyPanelPreferences();
@@ -30,15 +30,15 @@ public partial class MainWindow : Window
     }
     private void PositionPinned()
     {
-        var area=System.Windows.Forms.Screen.PrimaryScreen?.WorkingArea ?? System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position).WorkingArea;
-        Left=Math.Max(area.Left+12,area.Right-Width-12); Top=area.Top+12;
+        var area=SystemParameters.WorkArea; var width=ActualWidth>0 ? ActualWidth : Width; var height=ActualHeight>0 ? ActualHeight : Height;
+        Left=Math.Max(area.Left+12,area.Right-width-12); Top=Math.Max(area.Top+12,Math.Min(area.Bottom-height-12,area.Top+12));
     }
     public void ApplyPanelPreferences()
     {
         if (_settings.Current.PanelPinned)
         {
             var (width,height)=_settings.Current.PinnedPanelSize switch { "Compacto" => (640d,440d), "Amplio" => (960d,680d), _ => (780d,590d) };
-            Width=Math.Min(width,SystemParameters.WorkArea.Width-24); Height=Math.Min(height,SystemParameters.WorkArea.Height-24);
+            var area=SystemParameters.WorkArea; Width=Math.Min(width,area.Width-24); Height=Math.Min(height,area.Height-24);
             Topmost=true; ShowInTaskbar=true; if (IsVisible) PositionPinned();
         }
         else { Topmost=false; ShowInTaskbar=false; }
@@ -73,7 +73,7 @@ public partial class MainWindow : Window
         else if (Keyboard.Modifiers==ModifierKeys.Control && e.Key==Key.F) { SearchBox.Focus(); SearchBox.SelectAll(); e.Handled=true; }
         else if (Keyboard.Modifiers==ModifierKeys.Control && e.Key==Key.D) { ToggleFavorite(); e.Handled=true; }
     }
-    private void Window_Deactivated(object sender, EventArgs e) { if (!_openingSettings && !_settings.Current.PanelPinned) Dispatcher.BeginInvoke(HidePanel); }
+    private void Window_Deactivated(object sender, EventArgs e) { if (!_openingSettings && !_panelOptionsOpen && !_settings.Current.PanelPinned) Dispatcher.BeginInvoke(HidePanel); }
     private void Window_SizeChanged(object sender, SizeChangedEventArgs e) { if (IsVisible && _settings.Current.PanelPinned) PositionPinned(); }
     private void Copy_Click(object sender, RoutedEventArgs e) => CopySelected();
     private void CopySelected()
@@ -99,9 +99,24 @@ public partial class MainWindow : Window
         if (Selected is not { Type: ClipType.Text or ClipType.Code or ClipType.Url or ClipType.Color } item) return; var dialog=new EditClipWindow(item.Content){Owner=this}; if(dialog.ShowDialog()==true) { await _database.UpdateContentAsync(item.Id,dialog.Value); await RefreshAsync(); }
     }
     private void More_Click(object sender, RoutedEventArgs e) { if (Selected is null) return; var menu=ClipList.ContextMenu; menu.PlacementTarget=(Button)sender; menu.IsOpen=true; }
+    private void PanelOptions_Click(object sender, RoutedEventArgs e)
+    {
+        _panelOptionsOpen=true; var menu=new ContextMenu(); menu.Closed += (_,_)=>_panelOptionsOpen=false;
+        var anchor=new MenuItem { Header="Anclar panel arriba a la derecha", IsCheckable=true, IsChecked=_settings.Current.PanelPinned };
+        anchor.Click += async (_,_)=> { _settings.Current.PanelPinned=anchor.IsChecked; ApplyPanelPreferences(); await _settings.SaveAsync(); };
+        menu.Items.Add(anchor); menu.Items.Add(new Separator());
+        var sizes=new MenuItem { Header="Tamaño del panel" };
+        foreach(var size in new[]{"Compacto","Normal","Amplio"})
+        {
+            var option=new MenuItem { Header=size, IsCheckable=true, IsChecked=_settings.Current.PinnedPanelSize==size };
+            option.Click += async (_,_)=> { _settings.Current.PinnedPanelSize=size; _settings.Current.PanelPinned=true; ApplyPanelPreferences(); await _settings.SaveAsync(); };
+            sizes.Items.Add(option);
+        }
+        menu.Items.Add(sizes); menu.PlacementTarget=(Button)sender; menu.IsOpen=true;
+    }
     public void OpenSettings()
     {
-        _openingSettings=true; var dialog=new SettingsWindow(_settings,_database){Owner=this}; dialog.PanelPreferencesChanged += (_,_)=>ApplyPanelPreferences(); dialog.HistoryChanged += async (_,_)=>await RefreshAsync(); dialog.Closed += (_,_) => { _openingSettings=false; }; dialog.ShowDialog();
+        _openingSettings=true; var dialog=new SettingsWindow(_settings,_database){Owner=this}; dialog.HistoryChanged += async (_,_)=>await RefreshAsync(); dialog.Closed += (_,_) => { _openingSettings=false; }; dialog.ShowDialog();
     }
     private void Settings_Click(object sender, RoutedEventArgs e) => OpenSettings();
 }

@@ -42,7 +42,7 @@ public partial class App : System.Windows.Application
     internal static void ApplyTheme(string theme)
     {
         var dark=theme switch { "Light" => false, "Dark" => true, _ => UsesDarkSystemTheme() }; var r=Current.Resources;
-        r["BgColor"]=(System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(dark?"#FF17171C":"#FFF7F7FA"); r["SurfaceColor"]=(System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(dark?"#FF202027":"#FFFFFFFF"); r["SurfaceHoverColor"]=(System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(dark?"#FF2A2A34":"#FFEBEAF1"); r["TextColor"]=(System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(dark?"#FFF4F2FA":"#FF202027"); r["MutedColor"]=(System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(dark?"#FFA7A3B2":"#FF686574");
+        r["BgColor"]=(System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(dark?"#FF17171C":"#FFF7F7FA"); r["SurfaceColor"]=(System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(dark?"#FF202027":"#FFFFFFFF"); r["SurfaceHoverColor"]=(System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(dark?"#FF2A2A34":"#FFEBEAF1"); r["TextColor"]=(System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(dark?"#FFF4F2FA":"#FF202027"); r["MutedColor"]=(System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(dark?"#FFA7A3B2":"#FF686574"); r["AccentColor"]=(System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString((Current as App)?._settings?.Current.AccentColor ?? "#FF8B72FF");
     }
     private static bool UsesDarkSystemTheme()
     {
