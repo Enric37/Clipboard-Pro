@@ -4,7 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
-using System.Windows.Media;
+using System.Windows.Threading;
 using ClipboardPro.Interop;
 using ClipboardPro.Models;
 using ClipboardPro.Services;
@@ -14,10 +14,10 @@ namespace ClipboardPro;
 public partial class MainWindow : Window
 {
     private readonly ClipDatabase _database; private readonly ClipboardCaptureService _clipboard; private readonly SettingsService _settings; private readonly ObservableCollection<ClipItem> _items = new();
-    private CancellationTokenSource? _searchCts; private ClipType? _type; private bool _favorites; private int _loaded; private IntPtr _previousWindow; private bool _openingSettings; private bool _panelOptionsOpen; private bool _adjustingBounds; private bool _pinnedSizeInitialized;
+    private CancellationTokenSource? _searchCts; private ClipType? _type; private bool _favorites; private int _loaded; private IntPtr _previousWindow; private bool _openingSettings; private bool _panelOptionsOpen; private bool _adjustingBounds; private bool _pinnedSizeInitialized; private DispatcherTimer? _positionSaveTimer;
     public MainWindow(ClipDatabase database, ClipboardCaptureService clipboard, SettingsService settings)
     {
-        InitializeComponent(); _database=database; _clipboard=clipboard; _settings=settings; ClipList.ItemsSource=_items; AllFilter.Background = (System.Windows.Media.Brush)FindResource("SurfaceHoverBrush"); ApplyPanelPreferences(true);
+        InitializeComponent(); _database=database; _clipboard=clipboard; _settings=settings; ClipList.ItemsSource=_items; AllFilter.Background = (System.Windows.Media.Brush)FindResource("SurfaceHoverBrush"); _positionSaveTimer=new DispatcherTimer { Interval=TimeSpan.FromMilliseconds(300) }; _positionSaveTimer.Tick += async (_,_)=> { _positionSaveTimer.Stop(); await SavePanelPositionAsync(); }; ApplyPanelPreferences(true);
     }
     public async Task OpenAsync()
     {
@@ -66,7 +66,7 @@ public partial class MainWindow : Window
         }
         else { Topmost=false; ShowInTaskbar=false; _pinnedSizeInitialized=false; KeepPanelWithinWorkArea(false); }
     }
-    public void HidePanel() { _=SavePanelPositionAsync(); if (IsVisible) Hide(); }
+    public void HidePanel() { _positionSaveTimer?.Stop(); _=SavePanelPositionAsync(); if (IsVisible) Hide(); }
     private async Task RefreshAsync(bool append=false, CancellationToken cancellationToken=default)
     {
         if (!append) { _items.Clear(); _loaded=0; }
@@ -98,6 +98,11 @@ public partial class MainWindow : Window
     }
     private void Window_Deactivated(object sender, EventArgs e) { if (!_openingSettings && !_panelOptionsOpen && !_settings.Current.PanelPinned) Dispatcher.BeginInvoke(HidePanel); }
     private void Window_SizeChanged(object sender, SizeChangedEventArgs e) => KeepPanelWithinWorkArea(false);
+    private void Window_LocationChanged(object? sender, EventArgs e)
+    {
+        if(!IsVisible || _adjustingBounds || _positionSaveTimer is null) return;
+        _positionSaveTimer.Stop(); _positionSaveTimer.Start();
+    }
     private void KeepPanelWithinWorkArea(bool pinned)
     {
         if(_adjustingBounds || !IsLoaded) return;
@@ -135,20 +140,11 @@ public partial class MainWindow : Window
         if (Selected is not { Type: ClipType.Text or ClipType.Code or ClipType.Url or ClipType.Color } item) return; var dialog=new EditClipWindow(item.Content){Owner=this}; if(dialog.ShowDialog()==true) { await _database.UpdateContentAsync(item.Id,dialog.Value); await RefreshAsync(); }
     }
     private void More_Click(object sender, RoutedEventArgs e) { if (Selected is null) return; var menu=ClipList.ContextMenu; menu.PlacementTarget=(Button)sender; menu.IsOpen=true; }
-    private async void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if(e.LeftButton!=MouseButtonState.Pressed || IsInteractiveControl(e.OriginalSource as DependencyObject)) return;
-        try { DragMove(); KeepPanelWithinWorkArea(false); await SavePanelPositionAsync(); } catch { }
-    }
-    private async void DragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void DragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if(e.LeftButton!=MouseButtonState.Pressed) return;
-        try { DragMove(); KeepPanelWithinWorkArea(false); await SavePanelPositionAsync(); } catch { }
-    }
-    private static bool IsInteractiveControl(DependencyObject? element)
-    {
-        for(var current=element; current is not null; current=VisualTreeHelper.GetParent(current)) if(current is Button or TextBox) return true;
-        return false;
+        e.Handled=true;
+        try { DragMove(); KeepPanelWithinWorkArea(false); _positionSaveTimer?.Stop(); _positionSaveTimer?.Start(); } catch { }
     }
     private void PanelOptions_Click(object sender, RoutedEventArgs e)
     {
