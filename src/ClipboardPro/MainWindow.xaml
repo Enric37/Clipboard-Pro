@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:m="clr-namespace:ClipboardPro.Models"
-        Width="780" Height="590" MinWidth="620" MinHeight="440"
+        Width="780" Height="590" MinWidth="440" MinHeight="360"
         WindowStyle="None" ResizeMode="CanResizeWithGrip" Background="Transparent" AllowsTransparency="True" ShowInTaskbar="False"
         Deactivated="Window_Deactivated" KeyDown="Window_KeyDown" SizeChanged="Window_SizeChanged">
   <Border Margin="10" Background="{DynamicResource BgBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="16" Padding="15" SnapsToDevicePixels="True">
@@ -22,7 +22,8 @@
         <Button Grid.Column="2" Content="📌" FontSize="15" Click="PanelOptions_Click" ToolTip="Anclar panel y elegir tamaño"/>
         <Button Grid.Column="3" Content="⚙" FontSize="17" Click="Settings_Click" ToolTip="Configuración"/>
       </Grid>
-      <StackPanel Grid.Row="1" Orientation="Horizontal" VerticalAlignment="Center">
+      <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
         <Button x:Name="AllFilter" Style="{StaticResource PillButton}" Content="Todo" Tag="" Click="Filter_Click"/>
         <Button Style="{StaticResource PillButton}" Content="Texto" Tag="Text" Click="Filter_Click"/>
         <Button Style="{StaticResource PillButton}" Content="Imágenes" Tag="Image" Click="Filter_Click"/>
@@ -31,6 +32,7 @@
         <Button Style="{StaticResource PillButton}" Content="Código" Tag="Code" Click="Filter_Click"/>
         <Button Style="{StaticResource PillButton}" Content="★ Favoritos" Tag="Favorites" Click="Filter_Click"/>
       </StackPanel>
+      </ScrollViewer>
       <Grid Grid.Row="2">
         <ListBox x:Name="ClipList" SelectionChanged="ClipList_SelectionChanged" MouseDoubleClick="ClipList_MouseDoubleClick" ScrollViewer.ScrollChanged="ClipList_ScrollChanged">
           <ListBox.ItemsPanel><ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate></ListBox.ItemsPanel>

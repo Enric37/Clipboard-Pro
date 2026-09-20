@@ -7,7 +7,7 @@ public static class Branding
     public const string ProductName = "Clipboard Pro";
     public const string ExecutableName = "ClipboardPro.exe";
     public const string CompanyName = "Clipboard Pro";
-    public const string Version = "1.0.5";
+    public const string Version = "1.0.6";
     public static readonly string DataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), CompanyName, "ClipboardPro");
     public static readonly string DatabasePath = Path.Combine(DataDirectory, "clipboard.db");
     public static readonly string ImageDirectory = Path.Combine(DataDirectory, "images");
