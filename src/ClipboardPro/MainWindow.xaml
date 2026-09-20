@@ -11,7 +11,7 @@
       <Grid.RowDefinitions><RowDefinition Height="46"/><RowDefinition Height="45"/><RowDefinition Height="*"/><RowDefinition Height="38"/></Grid.RowDefinitions>
       <Grid Grid.Row="0" MouseLeftButtonDown="Header_MouseLeftButtonDown">
         <Grid.ColumnDefinitions><ColumnDefinition Width="36"/><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
-        <Image Width="28" Height="28" VerticalAlignment="Center" Source="/Assets/ClipboardPro-512.png" SnapsToDevicePixels="True"/>
+        <Border Width="30" Height="30" VerticalAlignment="Center" Cursor="SizeAll" ToolTip="Arrastra para mover el panel" MouseLeftButtonDown="DragHandle_MouseLeftButtonDown"><Image Width="28" Height="28" Source="/Assets/ClipboardPro-512.png" SnapsToDevicePixels="True"/></Border>
         <Border Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="10" Padding="10,0">
           <Grid>
             <TextBlock Text="🔍" Foreground="{DynamicResource MutedBrush}" FontSize="16" VerticalAlignment="Center"/>

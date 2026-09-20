@@ -137,7 +137,12 @@ public partial class MainWindow : Window
     private void More_Click(object sender, RoutedEventArgs e) { if (Selected is null) return; var menu=ClipList.ContextMenu; menu.PlacementTarget=(Button)sender; menu.IsOpen=true; }
     private async void Header_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if(_settings.Current.PanelPinned || e.LeftButton!=MouseButtonState.Pressed || IsInteractiveControl(e.OriginalSource as DependencyObject)) return;
+        if(e.LeftButton!=MouseButtonState.Pressed || IsInteractiveControl(e.OriginalSource as DependencyObject)) return;
+        try { DragMove(); KeepPanelWithinWorkArea(false); await SavePanelPositionAsync(); } catch { }
+    }
+    private async void DragHandle_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if(e.LeftButton!=MouseButtonState.Pressed) return;
         try { DragMove(); KeepPanelWithinWorkArea(false); await SavePanelPositionAsync(); } catch { }
     }
     private static bool IsInteractiveControl(DependencyObject? element)

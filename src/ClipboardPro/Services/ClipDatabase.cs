@@ -63,8 +63,11 @@ public sealed class ClipDatabase
         if (favorite) where.Add("c.favorite=1");
         if (!string.IsNullOrWhiteSpace(query))
         {
-            var safeTerms = string.Join(" ", query.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(x => '"' + x.Replace("\"", "") + '"'));
-            where.Add("c.id IN (SELECT rowid FROM clips_fts WHERE clips_fts MATCH $query)"); cmd.Parameters.AddWithValue("$query", safeTerms);
+            var words=query.Split(' ',StringSplitOptions.RemoveEmptyEntries).Select(word=>new string(word.Where(char.IsLetterOrDigit).ToArray())).Where(word=>word.Length>0).ToArray();
+            var like="%"+query.Replace("\\","\\\\").Replace("%","\\%").Replace("_","\\_")+"%";
+            if(words.Length==0) where.Add("(c.content LIKE $like ESCAPE '\\' OR c.source_process LIKE $like ESCAPE '\\')");
+            else { var prefixTerms=string.Join(" AND ",words.Select(word=>$"{word}*")); where.Add("(c.id IN (SELECT rowid FROM clips_fts WHERE clips_fts MATCH $query) OR c.content LIKE $like ESCAPE '\\' OR c.source_process LIKE $like ESCAPE '\\')"); cmd.Parameters.AddWithValue("$query",prefixTerms); }
+            cmd.Parameters.AddWithValue("$like",like);
         }
         cmd.CommandText = $"SELECT c.* FROM clips c {(where.Count > 0 ? "WHERE " + string.Join(" AND ", where) : "")} ORDER BY c.pinned DESC,c.favorite DESC,c.created_utc DESC LIMIT $take OFFSET $skip";
         cmd.Parameters.AddWithValue("$take", take); cmd.Parameters.AddWithValue("$skip", skip);
