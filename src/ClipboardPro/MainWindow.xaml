@@ -3,7 +3,7 @@
     <Border.Effect><DropShadowEffect BlurRadius="26" ShadowDepth="5" Opacity=".32" Color="#000000"/></Border.Effect>
     <Grid><Grid.RowDefinitions><RowDefinition Height="46"/><RowDefinition Height="45"/><RowDefinition Height="*"/><RowDefinition Height="38"/></Grid.RowDefinitions>
       <Grid Grid.Row="0"><Grid.ColumnDefinitions><ColumnDefinition Width="36"/><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/></Grid.ColumnDefinitions>
-        <Grid Width="28" Height="28" VerticalAlignment="Center"><Border Width="22" Height="22" Background="{DynamicResource AccentBrush}" CornerRadius="7" HorizontalAlignment="Left"/><Border Width="22" Height="22" Background="#FFB1A2FF" CornerRadius="7" HorizontalAlignment="Right" VerticalAlignment="Bottom" Opacity=".9"/><Path Data="M15,7 A8,8 0 1 0 15,23 L15,19 A4,4 0 1 1 15,11 Z" Fill="{DynamicResource BgBrush}" Stretch="Uniform" Margin="5"/></Grid>
+        <Image Width="28" Height="28" VerticalAlignment="Center" Source="/Assets/ClipboardPro-512.png" SnapsToDevicePixels="True"/>
         <Border Grid.Column="1" Background="{DynamicResource SurfaceBrush}" CornerRadius="10" Padding="10,0"><Grid><TextBlock Text="⌕" Foreground="{DynamicResource MutedBrush}" FontSize="22" VerticalAlignment="Center"/><TextBox x:Name="SearchBox" Margin="28,0,0,0" VerticalContentAlignment="Center" TextChanged="SearchBox_TextChanged" ToolTip="Buscar (Ctrl+F)"/><TextBlock x:Name="SearchHint" Text="Buscar en tu portapapeles..." Foreground="{DynamicResource MutedBrush}" Margin="32,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/></Grid></Border>
         <Button Grid.Column="2" Content="⚙" FontSize="17" Click="Settings_Click" ToolTip="Configuración"/>
       </Grid>

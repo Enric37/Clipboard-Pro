@@ -22,12 +22,14 @@ public partial class App : System.Windows.Application
         catch(Exception ex) { _log.Write("startup-failed",ex); System.Windows.MessageBox.Show("Clipboard Pro no pudo iniciarse. Consulta los logs locales para obtener detalles.",Branding.AppName,MessageBoxButton.OK,MessageBoxImage.Error); Shutdown(); }
     }
     private async Task OpenPanelAsync() { if (_window is not null) await _window.Dispatcher.InvokeAsync(async () => await _window.OpenAsync()); }
+#pragma warning disable CS8602 // ToolStripItemCollection.Add(string) returns a non-null menu item at runtime.
     private void CreateTray()
     {
         var menu=new Forms.ContextMenuStrip(); menu.Items.Add("Abrir Clipboard Pro",null,async (_,_)=>await OpenPanelAsync()); _updateMenu=menu.Items.Add("Actualización disponible",null,(_,_)=>OpenUpdatePage()) as Forms.ToolStripMenuItem; _updateMenu.Visible=false; var pause=menu.Items.Add("Pausar historial"); pause.Click += async (_,_)=> { if(_settings is null)return; _settings.Current.CapturePaused=!_settings.Current.CapturePaused; pause.Text=_settings.Current.CapturePaused?"Reanudar historial":"Pausar historial"; await _settings.SaveAsync(); }; menu.Items.Add("Limpiar historial",null,async (_,_)=>{if(_database is not null) await _database.ClearAsync();}); menu.Items.Add("Configuración",null,(_,_)=>_window?.Dispatcher.Invoke(()=>_window?.OpenSettings())); menu.Items.Add(new Forms.ToolStripSeparator()); menu.Items.Add("Salir",null,(_,_)=>Shutdown());
         var icon = System.Drawing.Icon.ExtractAssociatedIcon(Environment.ProcessPath ?? throw new InvalidOperationException("Executable path unavailable")) ?? System.Drawing.SystemIcons.Application;
         _tray=new Forms.NotifyIcon { Text=Branding.AppName, Icon=icon, ContextMenuStrip=menu, Visible=true }; _tray.DoubleClick += async (_,_)=>await OpenPanelAsync();
     }
+#pragma warning restore CS8602
     private void OnUpdateAvailable(object? sender, UpdateRelease update)
     {
         Dispatcher.Invoke(() => { if(_updateMenu is not null) { _updateMenu.Text=$"Actualizar a v{update.Version}"; _updateMenu.Visible=true; } _tray?.ShowBalloonTip(7000, Branding.AppName, $"Hay una actualización disponible: v{update.Version}. Haz clic en el icono de bandeja para instalarla.", Forms.ToolTipIcon.Info); });
