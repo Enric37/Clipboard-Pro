@@ -84,6 +84,9 @@ public sealed class ClipDatabase
     public Task DeleteAsync(long id) => DeleteWhereAsync("id=$id", cmd => cmd.Parameters.AddWithValue("$id", id));
     public async Task CleanupAsync(AppSettings settings)
     {
+        // History belongs to the user. Never remove it during startup unless a future
+        // explicit retention preference is enabled.
+        if (settings.KeepHistoryUntilCleared) return;
         await using var c = Open(); await c.OpenAsync(); await using var cmd = c.CreateCommand();
         cmd.CommandText = "DELETE FROM clips WHERE favorite=0 AND pinned=0 AND (created_utc < $date OR id NOT IN (SELECT id FROM clips ORDER BY pinned DESC,favorite DESC,created_utc DESC LIMIT $max))";
         cmd.Parameters.AddWithValue("$date", DateTime.UtcNow.AddDays(-settings.HistoryDays).ToString("O")); cmd.Parameters.AddWithValue("$max", settings.MaxItems); await cmd.ExecuteNonQueryAsync();

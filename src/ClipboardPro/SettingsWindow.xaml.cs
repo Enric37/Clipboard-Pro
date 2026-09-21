@@ -92,7 +92,7 @@ public partial class SettingsWindow : Window
     }
     private void ShowStorage()
     {
-        ContentPanel.Children.Clear(); ContentPanel.Children.Add(Heading("Almacenamiento")); ContentPanel.Children.Add(Info($"Datos locales: {Branding.DataDirectory}\nBase de datos: {Branding.DatabasePath}\nLas imágenes se almacenan en disco y se cargan bajo demanda.")); var open=new Button{Content="Abrir carpeta de datos",HorizontalAlignment=HorizontalAlignment.Left};open.Click += (_,_)=>Process.Start(new ProcessStartInfo("explorer.exe",$"\"{Branding.DataDirectory}\""){UseShellExecute=true});ContentPanel.Children.Add(open);
+        ContentPanel.Children.Clear(); ContentPanel.Children.Add(Heading("Almacenamiento")); ContentPanel.Children.Add(Info($"Datos locales: {Branding.DataDirectory}\nBase de datos: {Branding.DatabasePath}\nEl historial permanece después de reiniciar o apagar el ordenador, hasta que lo limpies. Las imágenes se almacenan en disco y se cargan bajo demanda.")); var open=new Button{Content="Abrir carpeta de datos",HorizontalAlignment=HorizontalAlignment.Left};open.Click += (_,_)=>Process.Start(new ProcessStartInfo("explorer.exe",$"\"{Branding.DataDirectory}\""){UseShellExecute=true});ContentPanel.Children.Add(open);
     }
     private void ShowAbout()
     {

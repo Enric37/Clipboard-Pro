@@ -1,6 +1,6 @@
 ; Build with Inno Setup 6. This creates a per-user install and a clean uninstaller.
 #define AppName "Clipboard Pro"
-#define AppVersion "1.0.15"
+#define AppVersion "1.0.16"
 #define AppExeName "ClipboardPro.exe"
 [Setup]
 AppId={{8BC88A28-B048-4EC6-A8CB-66EF8D1549E5}

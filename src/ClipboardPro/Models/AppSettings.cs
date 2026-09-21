@@ -19,6 +19,7 @@ public sealed class AppSettings
     public bool ProtectSensitiveContent { get; set; } = true;
     public bool CapturePaused { get; set; }
     public DateTime? PausedUntilUtc { get; set; }
+    public bool KeepHistoryUntilCleared { get; set; } = true;
     public int HistoryDays { get; set; } = 90;
     public int MaxItems { get; set; } = 10000;
     public int PreviewCacheMb { get; set; } = 80;
