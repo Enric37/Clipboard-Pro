@@ -61,9 +61,9 @@ public partial class MainWindow : Window
                 var (width,height)=_settings.Current.PinnedPanelSize switch { "Compacto" => (520d,420d), "Amplio" => (960d,680d), _ => (780d,590d) };
                 var area=GetWorkArea(); Width=Math.Min(width,Math.Max(MinWidth,area.Width-24)); Height=Math.Min(height,Math.Max(MinHeight,area.Height-24)); _pinnedSizeInitialized=true;
             }
-            Topmost=true; ShowInTaskbar=true; KeepPanelWithinWorkArea(false);
+            Topmost=true; ShowInTaskbar=true;
         }
-        else { Topmost=false; ShowInTaskbar=false; _pinnedSizeInitialized=false; KeepPanelWithinWorkArea(false); }
+        else { Topmost=false; ShowInTaskbar=false; _pinnedSizeInitialized=false; }
     }
     public void HidePanel() { _=SavePanelPositionAsync(); if (IsVisible) Hide(); }
     private async Task RefreshAsync(bool append=false, CancellationToken cancellationToken=default)
@@ -138,7 +138,7 @@ public partial class MainWindow : Window
     {
         if(e.LeftButton!=MouseButtonState.Pressed) return;
         e.Handled=true;
-        try { DragMove(); KeepPanelWithinWorkArea(false); await SavePanelPositionAsync(); } catch { }
+        try { DragMove(); await SavePanelPositionAsync(); } catch { }
     }
     private void PanelOptions_Click(object sender, RoutedEventArgs e)
     {
