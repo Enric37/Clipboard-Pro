@@ -13,7 +13,7 @@ namespace ClipboardPro;
 public partial class MainWindow : Window
 {
     private readonly ClipDatabase _database; private readonly ClipboardCaptureService _clipboard; private readonly SettingsService _settings; private readonly ObservableCollection<ClipItem> _items = new();
-    private CancellationTokenSource? _searchCts; private ClipType? _type; private bool _favorites; private int _loaded; private IntPtr _previousWindow; private bool _openingSettings; private bool _panelOptionsOpen; private bool _adjustingBounds; private bool _pinnedSizeInitialized;
+    private CancellationTokenSource? _searchCts; private ClipType? _type; private bool _favorites; private int _loaded; private IntPtr _previousWindow; private bool _openingSettings; private bool _panelOptionsOpen; private bool _adjustingBounds; private bool _pinnedSizeInitialized; private bool _isDragging;
     public MainWindow(ClipDatabase database, ClipboardCaptureService clipboard, SettingsService settings)
     {
         InitializeComponent(); _database=database; _clipboard=clipboard; _settings=settings; ClipList.ItemsSource=_items; AllFilter.Background = (System.Windows.Media.Brush)FindResource("SurfaceHoverBrush"); ApplyPanelPreferences(true);
@@ -95,7 +95,7 @@ public partial class MainWindow : Window
         else if (Keyboard.Modifiers==ModifierKeys.Control && e.Key==Key.F) { SearchBox.Focus(); SearchBox.SelectAll(); e.Handled=true; }
         else if (Keyboard.Modifiers==ModifierKeys.Control && e.Key==Key.D) { ToggleFavorite(); e.Handled=true; }
     }
-    private void Window_Deactivated(object sender, EventArgs e) { if (!_openingSettings && !_panelOptionsOpen && !_settings.Current.PanelPinned) Dispatcher.BeginInvoke(HidePanel); }
+    private void Window_Deactivated(object sender, EventArgs e) { if (!_isDragging && !_openingSettings && !_panelOptionsOpen && !_settings.Current.PanelPinned) Dispatcher.BeginInvoke(HidePanel); }
     private void Window_SizeChanged(object sender, SizeChangedEventArgs e) => KeepPanelWithinWorkArea(false);
     private void KeepPanelWithinWorkArea(bool pinned)
     {
@@ -138,7 +138,11 @@ public partial class MainWindow : Window
     {
         if(e.LeftButton!=MouseButtonState.Pressed) return;
         e.Handled=true;
-        try { DragMove(); await SavePanelPositionAsync(); } catch { }
+        _isDragging=true;
+        try { DragMove(); }
+        catch { }
+        finally { _isDragging=false; }
+        await SavePanelPositionAsync();
     }
     private void PanelOptions_Click(object sender, RoutedEventArgs e)
     {

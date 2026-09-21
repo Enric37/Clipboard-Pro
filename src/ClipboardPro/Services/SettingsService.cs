@@ -5,6 +5,7 @@ namespace ClipboardPro.Services;
 
 public sealed class SettingsService
 {
+    private readonly SemaphoreSlim _saveLock = new(1, 1);
     public AppSettings Current { get; private set; } = new();
     public async Task LoadAsync()
     {
@@ -13,5 +14,13 @@ public sealed class SettingsService
         try { Current = JsonSerializer.Deserialize<AppSettings>(await File.ReadAllTextAsync(Branding.SettingsPath)) ?? new(); }
         catch { Current = new(); }
     }
-    public Task SaveAsync() => File.WriteAllTextAsync(Branding.SettingsPath, JsonSerializer.Serialize(Current, new JsonSerializerOptions { WriteIndented = true }));
+    public async Task SaveAsync()
+    {
+        await _saveLock.WaitAsync();
+        try
+        {
+            await File.WriteAllTextAsync(Branding.SettingsPath, JsonSerializer.Serialize(Current, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        finally { _saveLock.Release(); }
+    }
 }
